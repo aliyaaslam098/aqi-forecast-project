@@ -133,3 +133,16 @@ shap_summary.png
 Aliya Aslam
 
 Data Engineering & Machine Learning Internship Project
+## Screenshots
+
+### FastAPI Forecast API
+
+![FastAPI Forecast](screenshots/fastapi_forecast.png)
+
+### Streamlit Dashboard
+
+![Streamlit Dashboard](screenshots/streamlit_dashboard.png)
+
+### SHAP Feature Importance
+
+![SHAP Summary](screenshots/shap_summary.png)
