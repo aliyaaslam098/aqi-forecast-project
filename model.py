@@ -1,17 +1,15 @@
 import pandas as pd
 import numpy as np
 import joblib
-import hopsworks
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import r2_score
 
-# =====================================
-# CONNECT TO HOPSWORKS
-# =====================================
-print("\n🔗 Connecting to Hopsworks...")
+import hopsworks
 
 project = hopsworks.login(
     project="A_Q_I_P",
@@ -20,50 +18,40 @@ project = hopsworks.login(
 
 fs = project.get_feature_store()
 
-print("✅ Connected Successfully")
+print("\n================================")
+print("LOADING DATASET")
+print("================================")
 
-# =====================================
-# LOAD FEATURE GROUP
-# =====================================
-print("\n📥 Loading Feature Group...")
+df = pd.read_csv("historical_aqi_dataset.csv")
 
-fg = fs.get_feature_group(
-    name="aqi_features",
-    version=1
+print(df.head())
+print(df.columns)
+print(df.shape)
+
+# ====================================
+# DATETIME FEATURES
+# ====================================
+
+df["datetime"] = pd.to_datetime(df["datetime"])
+
+df["hour"] = df["datetime"].dt.hour
+df["day"] = df["datetime"].dt.day
+df["month"] = df["datetime"].dt.month
+
+# ====================================
+# LAG FEATURES
+# ====================================
+
+df["aqi_lag_1"] = df["aqi"].shift(1)
+df["aqi_lag_2"] = df["aqi"].shift(2)
+
+df = df.dropna(
+    subset=[
+        "aqi_lag_1",
+        "aqi_lag_2"
+    ]
 )
 
-df = fg.read()
-
-print("✅ Data Loaded")
-print("Shape:", df.shape)
-
-# =====================================
-# CHECK EMPTY DATA
-# =====================================
-if df.empty:
-
-    print("\n❌ Feature Group is empty!")
-    print("Run features.py first.")
-
-    exit()
-
-# =====================================
-# DISPLAY DATA INFO
-# =====================================
-print("\n📋 Columns:")
-print(df.columns.tolist())
-
-print("\n📈 Dataset Statistics:")
-print(df.describe())
-
-# =====================================
-# CLEAN DATA
-# =====================================
-df = df.dropna()
-
-# =====================================
-# REQUIRED COLUMNS CHECK
-# =====================================
 required_columns = [
     "temperature",
     "humidity",
@@ -71,58 +59,19 @@ required_columns = [
     "aqi"
 ]
 
-missing_columns = [
-    col for col in required_columns
-    if col not in df.columns
-]
+df = df.dropna(subset=required_columns)
 
-if missing_columns:
+# ====================================
+# FEATURES
+# ====================================
 
-    print("\n❌ Missing Required Columns:")
-    print(missing_columns)
-
-    exit()
-
-# =====================================
-# DATETIME FEATURES
-# =====================================
-if "datetime" in df.columns:
-
-    print("\n🕒 Creating datetime features...")
-
-    df["datetime"] = pd.to_datetime(df["datetime"])
-
-    df["hour"] = df["datetime"].dt.hour
-    df["day"] = df["datetime"].dt.day
-    df["month"] = df["datetime"].dt.month
-
-else:
-
-    print("\n⚠️ datetime column missing")
-    print("Using default values")
-
-    df["hour"] = 12
-    df["day"] = 1
-    df["month"] = 1
-
-# =====================================
-# LAG FEATURES
-# =====================================
-print("\n📊 Creating lag features...")
-
-df["aqi_lag_1"] = df["aqi"].shift(1)
-df["aqi_lag_2"] = df["aqi"].shift(2)
-
-# remove NaNs from lagging
-df = df.dropna()
-
-# =====================================
-# FEATURES & TARGET
-# =====================================
-features = [
+FEATURES = [
     "temperature",
     "humidity",
     "wind_speed",
+    "pressure",
+    "cloud_cover",
+    "precipitation",
     "hour",
     "day",
     "month",
@@ -130,16 +79,19 @@ features = [
     "aqi_lag_2"
 ]
 
-X = df[features]
+print("\nRows after cleaning:")
+print(len(df))
 
+X = df[FEATURES]
 y = df["aqi"]
 
-print("\n✅ Features Ready")
-print("Feature Shape:", X.shape)
+print("\nFeatures Shape:")
+print(X.shape)
 
-# =====================================
+# ====================================
 # TRAIN TEST SPLIT
-# =====================================
+# ====================================
+
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
@@ -147,13 +99,13 @@ X_train, X_test, y_train, y_test = train_test_split(
     shuffle=False
 )
 
-# =====================================
+# ====================================
 # MODELS
-# =====================================
-models = {
+# ====================================
 
+models = {
     "RandomForest": RandomForestRegressor(
-        n_estimators=20,
+        n_estimators=100,
         random_state=42
     ),
 
@@ -161,14 +113,11 @@ models = {
 }
 
 best_model = None
-best_rmse = float("inf")
+best_rmse = 999999
 
-# =====================================
-# TRAINING LOOP
-# =====================================
 for name, model in models.items():
 
-    print(f"\n🚀 Training {name}...")
+    print(f"\nTraining {name}")
 
     model.fit(X_train, y_train)
 
@@ -182,10 +131,9 @@ for name, model in models.items():
 
     r2 = r2_score(y_test, predictions)
 
-    print(f"\n{name} Results")
-    print("MAE  :", round(mae, 3))
-    print("RMSE :", round(rmse, 3))
-    print("R²   :", round(r2, 3))
+    print("MAE :", round(mae, 2))
+    print("RMSE:", round(rmse, 2))
+    print("R2  :", round(r2, 2))
 
     if rmse < best_rmse:
 
@@ -193,14 +141,28 @@ for name, model in models.items():
         best_model = model
         best_model_name = name
 
-# =====================================
+# ====================================
 # SAVE MODEL
-# =====================================
+# ====================================
+
 joblib.dump(
     best_model,
     "aqi_forecast_model.pkl"
 )
 
-print(f"\n🏆 Best Model: {best_model_name}")
+joblib.dump(
+    FEATURES,
+    "model_features.pkl"
+)
 
-print("✅ Model Saved Successfully")
+print("\n================================")
+print("BEST MODEL")
+print("================================")
+
+print(best_model_name)
+
+print("\nModel saved:")
+print("aqi_forecast_model.pkl")
+
+print("Feature list saved:")
+print("model_features.pkl")

@@ -23,11 +23,12 @@ mr = project.get_model_registry()
 model = mr.python.create_model(
     name="aqi_prediction_model",
     metrics={
-        "accuracy": 0.95
+        "r2": 0.47,
+        "rmse": 6.99,
+        "mae": 5.71
     },
-    description="AQI prediction model"
+    description="Karachi AQI Forecast Model using Linear Regression"
 )
-
 # ===============================
 # SAVE MODEL ARTIFACTS
 # ===============================

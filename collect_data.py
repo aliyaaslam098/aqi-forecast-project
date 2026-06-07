@@ -20,13 +20,12 @@ CSV_FILE = "aqi_data.csv"
 # AQI CATEGORY → REALISTIC AQI
 # ==================================
 aqi_mapping = {
-    1: random.randint(20, 50),
-    2: random.randint(51, 100),
-    3: random.randint(101, 150),
-    4: random.randint(151, 200),
-    5: random.randint(201, 300)
+    1: 25,
+    2: 75,
+    3: 125,
+    4: 175,
+    5: 250
 }
-
 # ==================================
 # FETCH WEATHER
 # ==================================

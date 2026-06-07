@@ -49,7 +49,7 @@ if "id" not in df.columns:
 # ===============================
 fg = fs.get_or_create_feature_group(
     name="aqi_features",
-    version=1,
+    version=2,
     primary_key=["id"],
     description="AQI Prediction Dataset"
 )

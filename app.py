@@ -7,14 +7,13 @@ from datetime import datetime
 app = FastAPI()
 
 # =========================
-# API SETTINGS
+# SETTINGS
 # =========================
 
-API_KEY = "ba57b5a591714a8404a1f71b11f5acd1"
 CITY = "Karachi"
 
 # =========================
-# LOAD TRAINED MODEL
+# LOAD MODEL
 # =========================
 
 model = joblib.load("aqi_forecast_model.pkl")
@@ -26,69 +25,104 @@ model = joblib.load("aqi_forecast_model.pkl")
 @app.get("/forecast")
 def forecast():
 
-    # =========================
-    # GET 5-DAY WEATHER FORECAST
-    # =========================
-
     forecast_url = (
-        f"https://api.openweathermap.org/data/2.5/forecast"
-        f"?q={CITY}&appid={API_KEY}&units=metric"
+        "https://api.open-meteo.com/v1/forecast"
+        "?latitude=24.8607"
+        "&longitude=67.0011"
+        "&daily="
+        "temperature_2m_max,"
+        "relative_humidity_2m_mean,"
+        "precipitation_sum,"
+        "wind_speed_10m_max,"
+        "pressure_msl_mean,"
+        "cloud_cover_mean"
+        "&forecast_days=3"
+        "&timezone=auto"
     )
 
     response = requests.get(forecast_url)
+
     data = response.json()
 
-    forecast_list = data["list"]
+    daily = data["daily"]
 
+    # Load latest AQI history
+    history = pd.read_csv(
+        "historical_aqi_dataset.csv"
+    )
+
+    previous_aqi_1 = history["aqi"].iloc[-1]
+    previous_aqi_2 = history["aqi"].iloc[-2]
     results = []
 
-    # Take one prediction per day
-    selected_forecasts = [
-        forecast_list[0],
-        forecast_list[8],
-        forecast_list[16]
-    ]
+    for i in range(3):
 
-    # Dummy lag AQI values
-    previous_aqi_1 = 60
-    previous_aqi_2 = 55
+        date_str = daily["time"][i]
 
-    for item in selected_forecasts:
+        temperature = daily["temperature_2m_max"][i]
 
-        temperature = item["main"]["temp"]
-        humidity = item["main"]["humidity"]
-        wind_speed = item["wind"]["speed"]
+        humidity = daily["relative_humidity_2m_mean"][i]
 
-        dt = datetime.strptime(item["dt_txt"], "%Y-%m-%d %H:%M:%S")
+        wind_speed = daily["wind_speed_10m_max"][i]
 
-        hour = dt.hour
-        day = dt.day
-        month = dt.month
+        pressure = daily["pressure_msl_mean"][i]
 
-        # Create dataframe
+        cloud_cover = daily["cloud_cover_mean"][i]
+
+        precipitation = daily["precipitation_sum"][i]
+
+        dt = datetime.strptime(
+            date_str,
+            "%Y-%m-%d"
+        )
+
         features = pd.DataFrame([{
             "temperature": temperature,
             "humidity": humidity,
             "wind_speed": wind_speed,
-            "hour": hour,
-            "day": day,
-            "month": month,
+            "pressure": pressure,
+            "cloud_cover": cloud_cover,
+            "precipitation": precipitation,
+            "hour": 12,
+            "day": dt.day,
+            "month": dt.month,
             "aqi_lag_1": previous_aqi_1,
             "aqi_lag_2": previous_aqi_2
         }])
 
-        # Predict AQI
         predicted_aqi = model.predict(features)[0]
 
+        if predicted_aqi <= 50:
+            category = "Good"
+
+        elif predicted_aqi <= 100:
+            category = "Moderate"
+
+        elif predicted_aqi <= 150:
+            category = "Unhealthy for Sensitive Groups"
+
+        elif predicted_aqi <= 200:
+            category = "Unhealthy"
+
+        elif predicted_aqi <= 300:
+            category = "Very Unhealthy"
+
+        else:
+            category = "Hazardous"
+
         results.append({
-            "date": dt.strftime("%Y-%m-%d"),
-            "temperature": round(temperature, 2),
-            "humidity": humidity,
-            "wind_speed": wind_speed,
-            "predicted_aqi": round(predicted_aqi, 2)
+            "date": date_str,
+            "temperature": round(float(temperature), 2),
+            "humidity": round(float(humidity), 2),
+            "wind_speed": round(float(wind_speed), 2),
+            "pressure": round(float(pressure), 2),
+            "cloud_cover": round(float(cloud_cover), 2),
+            "precipitation": round(float(precipitation), 2),
+            "predicted_aqi": round(float(predicted_aqi), 2),
+            "category": category
         })
 
-        # Update lag values
+        # Update lag values for next day
         previous_aqi_2 = previous_aqi_1
         previous_aqi_1 = predicted_aqi
 

@@ -21,26 +21,35 @@ LON = 67.0011
 # WEATHER API URL
 # ==========================================
 
-weather_url = f"https://api.openweathermap.org/data/2.5/weather?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric"
+weather_url = (
+    f"https://api.openweathermap.org/data/2.5/weather"
+    f"?lat={LAT}"
+    f"&lon={LON}"
+    f"&appid={API_KEY}"
+    f"&units=metric"
+)
 
 # ==========================================
 # AQI API URL
 # ==========================================
 
-aqi_url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={LAT}&lon={LON}&appid={API_KEY}"
+aqi_url = (
+    f"https://api.openweathermap.org/data/2.5/air_pollution"
+    f"?lat={LAT}"
+    f"&lon={LON}"
+    f"&appid={API_KEY}"
+)
 
 # ==========================================
 # FETCH WEATHER DATA
 # ==========================================
 
 weather_response = requests.get(weather_url)
-
 weather_data = weather_response.json()
 
-print("\n===================================")
+print("\n==============================")
 print("RAW WEATHER API RESPONSE")
-print("===================================")
-
+print("==============================")
 print(weather_data)
 
 # ==========================================
@@ -48,33 +57,44 @@ print(weather_data)
 # ==========================================
 
 aqi_response = requests.get(aqi_url)
-
 aqi_data = aqi_response.json()
 
-print("\n===================================")
+print("\n==============================")
 print("RAW AQI API RESPONSE")
-print("===================================")
-
+print("==============================")
 print(aqi_data)
 
 # ==========================================
-# EXTRACT FEATURES
+# EXTRACT WEATHER FEATURES
 # ==========================================
 
 temperature = weather_data["main"]["temp"]
-
 humidity = weather_data["main"]["humidity"]
-
 wind_speed = weather_data["wind"]["speed"]
 
-aqi = aqi_data["list"][0]["main"]["aqi"]
+# ==========================================
+# EXTRACT AQI FEATURES
+# ==========================================
+
+aqi_category = aqi_data["list"][0]["main"]["aqi"]
+
+components = aqi_data["list"][0]["components"]
+
+co = components["co"]
+no2 = components["no2"]
+o3 = components["o3"]
+so2 = components["so2"]
+pm25 = components["pm2_5"]
+pm10 = components["pm10"]
+
+# ==========================================
+# DATETIME FEATURES
+# ==========================================
 
 now = datetime.now()
 
 hour = now.hour
-
 day = now.day
-
 month = now.month
 
 # ==========================================
@@ -87,16 +107,21 @@ df = pd.DataFrame([{
     "temperature": temperature,
     "humidity": humidity,
     "wind_speed": wind_speed,
-    "aqi": aqi,
+    "pm25": pm25,
+    "pm10": pm10,
+    "co": co,
+    "no2": no2,
+    "o3": o3,
+    "so2": so2,
+    "aqi": aqi_category,
     "hour": hour,
     "day": day,
     "month": month
 }])
 
-print("\n===================================")
+print("\n==============================")
 print("FEATURE DATA")
-print("===================================")
-
+print("==============================")
 print(df)
 
 # ==========================================
@@ -109,19 +134,23 @@ try:
 
     old_df = pd.read_csv(csv_file)
 
-    updated_df = pd.concat([old_df, df], ignore_index=True)
+    updated_df = pd.concat(
+        [old_df, df],
+        ignore_index=True
+    )
 
 except FileNotFoundError:
 
     updated_df = df
 
-updated_df.to_csv(csv_file, index=False)
+updated_df.to_csv(
+    csv_file,
+    index=False
+)
 
-print("\n===================================")
+print("\n==============================")
 print("LOCAL CSV SAVED")
-print("===================================")
-
-print(f"Data saved to {csv_file}")
+print("==============================")
 
 # ==========================================
 # CONNECT TO HOPSWORKS
@@ -132,45 +161,45 @@ project = hopsworks.login(
     api_key_value="dIHUaXgn5ma9oLPx.pclDo5CA72LP7jWzF0nKQPjHiDo2CjR6SGxiIk6DmsDS55u6GFHQ1iVPx9a2qwLr"
 )
 
-print("\n===================================")
+print("\n==============================")
 print("CONNECTED TO HOPSWORKS")
-print("===================================")
+print("==============================")
 
 # ==========================================
-# GET FEATURE STORE
+# FEATURE STORE
 # ==========================================
 
 fs = project.get_feature_store()
 
 # ==========================================
-# CREATE FEATURE GROUP
+# FEATURE GROUP
 # ==========================================
 
 feature_group = fs.get_or_create_feature_group(
 
-    name="weather_features",
+    name="aqi_features",
 
-    version=1,
+    version=2,
 
-    description="Weather and AQI features for forecasting",
+    description="AQI Forecasting Features",
 
     primary_key=["datetime"],
 
     online_enabled=True
 )
 
-print("\n===================================")
+print("\n==============================")
 print("FEATURE GROUP READY")
-print("===================================")
+print("==============================")
 
 # ==========================================
-# INSERT DATA INTO FEATURE STORE
+# INSERT INTO FEATURE STORE
 # ==========================================
 
 feature_group.insert(df)
 
-print("\n===================================")
-print("DATA INSERTED INTO HOPSWORKS")
-print("===================================")
+print("\n==============================")
+print("DATA INSERTED TO HOPSWORKS")
+print("==============================")
 
 print("SUCCESS")
