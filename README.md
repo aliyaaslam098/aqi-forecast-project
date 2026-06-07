@@ -522,3 +522,7 @@ The dashboard will open automatically in your browser.
 ### System Information
 
 ![System Info](screenshots/system.png)
+
+## Project Architecture
+
+![Architecture](screenshots/project_architecture.png)
