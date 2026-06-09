@@ -4,6 +4,11 @@
 
 📍 Karachi, Pakistan
 
+## 🚀 Live Demo
+
+Streamlit Application:
+https://aqi-forecast-project-dhywpnzymkjiphb4t4zjwv.streamlit.app/
+
 **Developed by:** Aliya Faisal
 **Internship Project:** May–June 2026
 
